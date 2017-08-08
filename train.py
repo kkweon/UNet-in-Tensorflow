@@ -189,7 +189,7 @@ def make_unet(X, training):
     """
     net = X / 127.5 - 1
     net = tf.layers.conv2d(net, 3, (1, 1), name="color_space_adjust")
-    conv1, pool1 = conv_conv_pool(X, [8, 8], training, name=1)
+    conv1, pool1 = conv_conv_pool(net, [8, 8], training, name=1)
     conv2, pool2 = conv_conv_pool(pool1, [16, 16], training, name=2)
     conv3, pool3 = conv_conv_pool(pool2, [32, 32], training, name=3)
     conv4, pool4 = conv_conv_pool(pool3, [64, 64], training, name=4)
