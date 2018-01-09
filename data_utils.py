@@ -1,22 +1,23 @@
+import argparse
+import logging
 import os
 import shutil
-import cv2
 import time
-import argparse
+from multiprocessing.pool import Pool
+# For Typing Annotation
+from typing import Tuple, Optional
+
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import logging
-import matplotlib
-import matplotlib.pyplot as plt
-from multiprocessing.pool import Pool
 from keras import backend as K
 
-matplotlib.use('qt5agg')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def plot_image(image, title=None, **kwargs):
+def plot_image(image: np.ndarray, title: Optional[str]=None, **kwargs) -> None:
     """Plot a single image
 
     Args:
@@ -32,13 +33,20 @@ def plot_image(image, title=None, **kwargs):
         plt.imshow(image, **kwargs)
     else:
         raise TypeError(
-            "2-D array or 3-D array should be given but {} was given".format(shape))
+            "2-D array or 3-D array should be given but {} was given".format(
+                shape))
 
     if title:
         plt.title(title)
 
 
-def plot_two_images(image_A, title_A, image_B, title_B, figsize=(15, 15), kwargs_1={}, kwargs_2={}):
+def plot_two_images(image_A: np.ndarray,
+                    title_A: str,
+                    image_B: np.ndarray,
+                    title_B: str,
+                    figsize: Tuple[int, int]=(15, 15),
+                    kwargs_1: dict={},
+                    kwargs_2: dict={}) -> None:
     """Plot two images side by side"""
     plt.figure(figsize=figsize)
     plt.subplot(1, 2, 1)
@@ -48,7 +56,7 @@ def plot_two_images(image_A, title_A, image_B, title_B, figsize=(15, 15), kwargs
     plot_image(image_B, title=title_B, **kwargs_2)
 
 
-def create_clean_dir(dirname="resize"):
+def create_clean_dir(dirname: str) -> None:
     """Create an empty directory
 
     Args:
@@ -65,21 +73,26 @@ def create_clean_dir(dirname="resize"):
     assert len(os.listdir(dirname)) == 0
 
 
-def read_image(image_path):
+def read_image(image_path: str, gray: bool=False) -> np.ndarray:
     """Returns an image array
 
     Args:
         image_path (str): Path to image.jpg
+        gray (bool): Grayscale flag
 
     Returns:
-        3-D array: RGB numpy image array
+        np.ndarray: 3D numpy array of shape (H, W, 3) or 2D Grayscale Image (H, W)
     """
+    if gray:
+        return cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
     image = cv2.imread(image_path)
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
-def read_image_and_resize(image_path, new_WH=(512, 512), save_dir="resize"):
+def read_image_and_resize(image_path: str,
+                          new_WH: Tuple[int, int]=(512, 512),
+                          save_dir: str="resize") -> str:
     """Reads an image and resize it
 
     1) open `image_path` that is image.jpg
@@ -104,7 +117,9 @@ def read_image_and_resize(image_path, new_WH=(512, 512), save_dir="resize"):
     return image_path
 
 
-def adjust_bbox(bboxframe, src_size, dst_size):
+def adjust_bbox(bboxframe: pd.DataFrame,
+                src_size: Tuple[int, int],
+                dst_size: Tuple[int, int]) -> pd.DataFrame:
     """Returns a new dataframe with adjusted coordinates
 
       W            W_new
@@ -135,45 +150,56 @@ def adjust_bbox(bboxframe, src_size, dst_size):
 def read_flags():
     """Returns global variables"""
 
-    parser = argparse.ArgumentParser(description="resize image and adjusts coordinates")
-    parser.add_argument("--src_csv",
-                        default="labels.csv",
-                        help="/path/to/labels.csv (default: ./labels.csv)")
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="resize image and adjusts coordinates")
+    parser.add_argument(
+        "--src_csv",
+        default="data/labels_crowdai.csv",
+        help="/path/to/labels.csv")
 
-    parser.add_argument("--save_dir",
-                        default="resize",
-                        help="path to the directory in which resize image will be saved (default: resize)")
+    parser.add_argument(
+        "--data_dir",
+        default="object-detection-crowdai",
+        help="Directory where training datasets are located")
 
-    parser.add_argument("--target_width",
-                        default=960,
-                        help="new target width (default: 960)")
+    parser.add_argument(
+        "--save_dir",
+        default="data_resize",
+        help="path to the directory in which resize image will be saved")
 
-    parser.add_argument("--target_height",
-                        default=640,
-                        help="target height (default: 640)")
+    parser.add_argument(
+        "--target_width", default=960, help="new target width (default: 960)")
 
-    parser.add_argument("--target_csv",
-                        default="labels_resized.csv",
-                        help="target csv filename")
+    parser.add_argument(
+        "--target_height", default=640, help="target height (default: 640)")
+
+    parser.add_argument(
+        "--target_csv",
+        default="labels_resized.csv",
+        help="target csv filename")
 
     return parser.parse_args()
 
 
-def get_relevant_frames(image_path_list, dataframe):
+def get_relevant_frames(image_path_list: List[str],
+                        dataframe: pd.DataFrame) -> pd.DataFrame:
     """Returns a dataframe that contains input image path
 
     Args:
-        image_path_list (1-D array): Each element is a str "path/to/image.jpg"
+        image_path_list (List[str]): Each element is a str "path/to/image.jpg"
         dataframe (pd.DataFrame): The base frame to be searched
 
     Returns:
         pd.DataFrame: A dataframe that contains input images
     """
 
-    return dataframe[dataframe["Frame"].isin(image_path_list)].reset_index(drop=True)
+    return dataframe[dataframe["Frame"].isin(image_path_list)].reset_index(
+        drop=True)
 
 
-def get_mask(image, bbox_frame):
+def get_mask(image: Tuple[int, int, int],
+             bbox_frame: pd.DataFrame) -> np.ndarray:
     """Returns a binary mask
 
     Args:
@@ -200,7 +226,9 @@ def get_mask(image, bbox_frame):
     return mask
 
 
-def create_mask(image_WH, image_path, dataframe):
+def create_mask(image_WH: tuple[int, int],
+                image_path: str,
+                dataframe: pd.DataFrame) -> np.ndarray:
     """Returns a mask array
 
     Object = 1
@@ -234,9 +262,12 @@ def create_mask(image_WH, image_path, dataframe):
     return mask
 
 
-def generate_mask_pipeline(image_WH, image_path, dataframe, save_dir="mask"):
+def generate_mask_pipeline(image_WH: tuple[int, int],
+                           image_path: str,
+                           dataframe: pd.DataFrame,
+                           save_dir: str="mask") -> None:
     """Create a mask and save as JPG
-    
+
     Args:
         image_WH (tuple): (width: int, height: int)
         image_path (str): path/to/image.jpg
@@ -250,7 +281,7 @@ def generate_mask_pipeline(image_WH, image_path, dataframe, save_dir="mask"):
     cv2.imwrite(full_path, mask)
 
 
-def get_IOU(y_true, y_pred):
+def get_IOU(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Returns the intersection over union (IOU)
 
     Args:
@@ -272,8 +303,15 @@ def get_IOU(y_true, y_pred):
     return numerator / denominator
 
 
-def IOU_loss(y_true, y_pred):
-    return - get_IOU(y_true, y_pred)
+def get_IOU_loss(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Return a negated IOU
+
+    The higher IOU is, the better.
+    But we want an objective function to minimize.
+
+    Hence, negate the IOU such that the lower the value is, the better it is
+    """
+    return -get_IOU(y_true, y_pred)
 
 
 def main(FLAGS):
@@ -281,7 +319,8 @@ def main(FLAGS):
     new_WH = (FLAGS.target_width, FLAGS.target_height)
     new_labels_name = FLAGS.target_csv
     data = pd.read_csv(FLAGS.src_csv)
-    data["Frame"] = data["Frame"].map(lambda x: "images/" + x)
+    data["Frame"] = data["Frame"].map(
+        lambda x: os.path.join(FLAGS.data_dir, x))
 
     create_clean_dir(save_dir)
     logger.info("Cleaned {} directory".format(save_dir))
@@ -289,7 +328,9 @@ def main(FLAGS):
     logger.info("Resizing begins")
     start = time.time()
     pool = Pool()
-    pool.starmap_async(read_image_and_resize, [(image_path, new_WH, save_dir) for image_path in data["Frame"].unique()])
+    pool.starmap_async(read_image_and_resize,
+                       [(image_path, new_WH, save_dir)
+                        for image_path in data["Frame"].unique()])
 
     pool.close()
     pool.join()
@@ -305,7 +346,8 @@ def main(FLAGS):
     H, W, _ = image.shape
     src_size = (W, H)
     labels = adjust_bbox(data, src_size, new_WH)
-    labels["Frame"] = labels["Frame"].map(lambda x: os.path.join(save_dir, os.path.basename(x)))
+    labels["Frame"] = labels["Frame"].map(
+        lambda x: os.path.join(save_dir, os.path.basename(x)))
 
     create_clean_dir("mask")
     logger.info("Cleaned {} directory".format("mask"))
@@ -313,14 +355,16 @@ def main(FLAGS):
     start = time.time()
 
     pool = Pool()
-    tasks = [(new_WH, image_path, labels, "mask")for image_path in labels["Frame"].unique()]
+    tasks = [(new_WH, image_path, labels, "mask")
+             for image_path in labels["Frame"].unique()]
     pool.starmap_async(generate_mask_pipeline, tasks)
     pool.close()
     pool.join()
     end = time.time()
     logger.info("Masking ends. Time elapsed: {}".format(end - start))
 
-    labels["Mask"] = labels["Frame"].map(lambda x: "mask/" + os.path.basename(x))
+    labels["Mask"] = labels["Frame"].map(
+        lambda x: "mask/" + os.path.basename(x))
     labels.to_csv(new_labels_name, index=False)
 
     logger.info("Adjustment saved to {}".format(new_labels_name))
