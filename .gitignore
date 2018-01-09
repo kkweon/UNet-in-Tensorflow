@@ -138,3 +138,4 @@ object-detection-crowdai/
 logdir
 /train.csv
 /test.csv
+models
