@@ -56,12 +56,16 @@ Loss function: maximize IOU
 
 ### Download dataset
 
+- the annotated driving dataset is provided by [Udacity](https://github.com/udacity/self-driving-car/tree/master/annotations)
+- In total, 9,423 frames with 65,000 labels at 1920x1200 resolution.
+
 ```bash
 make download
 ```
 
-
 ### Resize image and generate mask images
+
+- [utils/data.py](./utils/data.py) is used to resize images and generate masks
 
 ```bash
 make generate
@@ -74,8 +78,35 @@ Make sure masks and bounding boxes
 ```bash
 jupyter notebook "Visualization & Train Test Split.ipynb"
 ```
+
 ### Train
 
 ```bash
+# Train for 1 epoch
 python train.py
+```
+
+or
+
+```bash
+$ python train.py --help
+usage: train.py [-h] [--epochs EPOCHS] [--batch-size BATCH_SIZE]
+                [--logdir LOGDIR] [--reg REG] [--ckdir CKDIR]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --epochs EPOCHS       Number of epochs (default: 1)
+  --batch-size BATCH_SIZE
+                        Batch size (default: 4)
+  --logdir LOGDIR       Tensorboard log directory (default: logdir)
+  --reg REG             L2 Regularizer Term (default: 0.1)
+  --ckdir CKDIR         Checkpoint directory (default: models)
+```
+
+### Test
+
+- Open the Jupyter notebook file to run against test data
+
+```bash
+jupyter notebook "./Test Run After Training.ipynb"
 ```
