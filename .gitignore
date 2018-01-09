@@ -135,3 +135,6 @@ data_resize
 /labels_resized.csv
 object-detection-crowdai/
 /udacity-annoations-crowdai
+logdir
+/train.csv
+/test.csv

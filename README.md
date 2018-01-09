@@ -42,7 +42,7 @@ Loss function: maximize IOU
     (union of prediction & ground truth)
 ```
 
-## Examples on Test Data: trained for 3 epochs
+### Examples on Test Data: trained for 3 epochs
 <img src="assets/result1.png" />
 <img src="assets/result2.png" />
 <img src="assets/result3.png" />
@@ -51,23 +51,31 @@ Loss function: maximize IOU
 <img src="assets/result6.png" />
 <img src="assets/result7.png" />
 
-## Files
+
+## Get Started
+
+### Download dataset
+
+```bash
+make download
 ```
-.
-├── assets/ # image assets
-├── data_utils.py # for data preprocessing
-├── README.md
-├── test.ipynb
-├── train.py
+
+
+### Resize image and generate mask images
+
+```bash
+make generate
 ```
 
+### Train Test Split
 
-## Datasets
-- [Annotated Driving Dataset by Udacity & CrowdAI](https://github.com/udacity/self-driving-car/tree/master/annotations)
-- The dataset was processed using `data_utils.py` in this repo to be used for U-Net
+Make sure masks and bounding boxes
 
-## Notes
-In the original paper, the pixel-wise softmax was used.
-But, I used the IOU because the datasets I used are
-not labeled for segmentations
+```bash
+jupyter notebook "Visualization & Train Test Split.ipynb"
+```
+### Train
 
+```bash
+python train.py
+```

@@ -1,4 +1,4 @@
-.PHONY: download
+.PHONY: download generate clean cleaner
 
 
 # Download raw datasets (by Udacity)
@@ -21,9 +21,19 @@ download:
 
 # Generate training images
 generate:
-	python data_utils.py
+	python utils/data.py
 
 
-cleaner:
+# Fresh Training
+fresh:
+	rm -rf logdir models
+
+# Remove augmented data
+clean:
+	rm -rf data_resize mask
+
+
+# Remove raw original data
+cleaner:	clean
 	rm -rf data
 	rm -rf object-detection-crowdai

@@ -84,7 +84,8 @@ def get_image_mask(queue, augmentation=True):
     text_reader = tf.TextLineReader(skip_header_lines=1)
     _, csv_content = text_reader.read(queue)
 
-    image_path, mask_path = tf.decode_csv(csv_content, record_defaults=[[""], [""]])
+    image_path, mask_path = tf.decode_csv(
+        csv_content, record_defaults=[[""], [""]])
 
     image_file = tf.read_file(image_path)
     mask_file = tf.read_file(mask_path)
@@ -104,7 +105,12 @@ def get_image_mask(queue, augmentation=True):
     return image, mask
 
 
-def conv_conv_pool(input_, n_filters, training, name, pool=True, activation=tf.nn.relu):
+def conv_conv_pool(input_,
+                   n_filters,
+                   training,
+                   name,
+                   pool=True,
+                   activation=tf.nn.relu):
     """{Conv -> BN -> RELU}x2 -> {Pool, optional}
 
     Args:
@@ -123,19 +129,26 @@ def conv_conv_pool(input_, n_filters, training, name, pool=True, activation=tf.n
 
     with tf.variable_scope("layer{}".format(name)):
         for i, F in enumerate(n_filters):
-            net = tf.layers.conv2d(net, F, (3, 3), activation=None, padding='same', name="conv_{}".format(i + 1))
-            net = tf.layers.batch_normalization(net, training=training, name="bn_{}".format(i + 1))
+            net = tf.layers.conv2d(
+                net,
+                F, (3, 3),
+                activation=None,
+                padding='same',
+                name="conv_{}".format(i + 1))
+            net = tf.layers.batch_normalization(
+                net, training=training, name="bn_{}".format(i + 1))
             net = activation(net, name="relu{}_{}".format(name, i + 1))
 
         if pool is False:
             return net
 
-        pool = tf.layers.max_pooling2d(net, (2, 2), strides=(2, 2), name="pool_{}".format(name))
+        pool = tf.layers.max_pooling2d(
+            net, (2, 2), strides=(2, 2), name="pool_{}".format(name))
 
         return net, pool
 
 
-def upsample_concat(inputA, input_B, name):
+def upconv_concat(inputA, input_B, n_filter, name):
     """Upsample `inputA` and concat with `input_B`
 
     Args:
@@ -146,30 +159,30 @@ def upsample_concat(inputA, input_B, name):
     Returns:
         output (4-D Tensor): (N, 2*H, 2*W, C + C2)
     """
-    upsample = upsampling_2D(inputA, size=(2, 2), name=name)
+    up_conv = upconv_2D(inputA, n_filter, name)
 
-    return tf.concat([upsample, input_B], axis=-1, name="concat_{}".format(name))
+    return tf.concat(
+        [up_conv, input_B], axis=-1, name="concat_{}".format(name))
 
 
-def upsampling_2D(tensor, name, size=(2, 2)):
-    """Upsample/Rescale `tensor` by size
+def upconv_2D(tensor, n_filter, name):
+    """Up Convolution `tensor` by 2 times
 
     Args:
         tensor (4-D Tensor): (N, H, W, C)
+        n_filter (int): Filter Size
         name (str): name of upsampling operations
-        size (tuple, optional): (height_multiplier, width_multiplier)
-            (default: (2, 2))
 
     Returns:
-        output (4-D Tensor): (N, h_multiplier * H, w_multiplier * W, C)
+        output (4-D Tensor): (N, 2 * H, 2 * W, C)
     """
-    H, W, _ = tensor.get_shape().as_list()[1:]
 
-    H_multi, W_multi = size
-    target_H = H * H_multi
-    target_W = W * W_multi
-
-    return tf.image.resize_nearest_neighbor(tensor, (target_H, target_W), name="upsample_{}".format(name))
+    return tf.layers.conv2d_transpose(
+        tensor,
+        filters=n_filter,
+        kernel_size=2,
+        strides=2,
+        name="upsample_{}".format(name))
 
 
 def make_unet(X, training):
@@ -195,19 +208,24 @@ def make_unet(X, training):
     conv4, pool4 = conv_conv_pool(pool3, [64, 64], training, name=4)
     conv5 = conv_conv_pool(pool4, [128, 128], training, name=5, pool=False)
 
-    up6 = upsample_concat(conv5, conv4, name=6)
+    up6 = upconv_concat(conv5, conv4, 64, name=6)
     conv6 = conv_conv_pool(up6, [64, 64], training, name=6, pool=False)
 
-    up7 = upsample_concat(conv6, conv3, name=7)
+    up7 = upconv_concat(conv6, conv3, 32, name=7)
     conv7 = conv_conv_pool(up7, [32, 32], training, name=7, pool=False)
 
-    up8 = upsample_concat(conv7, conv2, name=8)
+    up8 = upconv_concat(conv7, conv2, 16, name=8)
     conv8 = conv_conv_pool(up8, [16, 16], training, name=8, pool=False)
 
-    up9 = upsample_concat(conv8, conv1, name=9)
+    up9 = upconv_concat(conv8, conv1, 8, name=9)
     conv9 = conv_conv_pool(up9, [8, 8], training, name=9, pool=False)
 
-    return tf.layers.conv2d(conv9, 1, (1, 1), name='final', activation=tf.nn.sigmoid, padding='same')
+    return tf.layers.conv2d(
+        conv9,
+        1, (1, 1),
+        name='final',
+        activation=tf.nn.sigmoid,
+        padding='same')
 
 
 def IOU_(y_pred, y_true):
@@ -229,7 +247,9 @@ def IOU_(y_pred, y_true):
     true_flat = tf.reshape(y_true, [-1, H * W])
 
     intersection = 2 * tf.reduce_sum(pred_flat * true_flat, axis=1) + 1e-7
-    denominator = tf.reduce_sum(pred_flat, axis=1) + tf.reduce_sum(true_flat, axis=1) + 1e-7
+    denominator = tf.reduce_sum(
+        pred_flat, axis=1) + tf.reduce_sum(
+            true_flat, axis=1) + 1e-7
 
     return tf.reduce_mean(intersection / denominator)
 
@@ -266,23 +286,21 @@ def read_flags():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs",
-                        default=1,
-                        type=int,
-                        help="Number of epochs (default: 1)")
+    parser.add_argument(
+        "--epochs", default=1, type=int, help="Number of epochs (default: 1)")
 
-    parser.add_argument("--batch-size",
-                        default=4,
-                        type=int,
-                        help="Batch size (default: 4)")
+    parser.add_argument(
+        "--batch-size", default=4, type=int, help="Batch size (default: 4)")
 
-    parser.add_argument("--logdir",
-                        default="logdir",
-                        help="Tensorboard log directory (default: logdir)")
+    parser.add_argument(
+        "--logdir",
+        default="logdir",
+        help="Tensorboard log directory (default: logdir)")
 
-    parser.add_argument("--ckdir",
-                        default="models",
-                        help="Checkpoint directory (default: models)")
+    parser.add_argument(
+        "--ckdir",
+        default="models",
+        help="Checkpoint directory (default: models)")
 
     flags = parser.parse_args()
     return flags
@@ -327,16 +345,18 @@ def main(flags):
     train_image, train_mask = get_image_mask(train_csv)
     test_image, test_mask = get_image_mask(test_csv, augmentation=False)
 
-    X_batch_op, y_batch_op = tf.train.shuffle_batch([train_image, train_mask],
-                                                    batch_size=flags.batch_size,
-                                                    capacity=flags.batch_size * 5,
-                                                    min_after_dequeue=flags.batch_size * 2,
-                                                    allow_smaller_final_batch=True)
+    X_batch_op, y_batch_op = tf.train.shuffle_batch(
+        [train_image, train_mask],
+        batch_size=flags.batch_size,
+        capacity=flags.batch_size * 5,
+        min_after_dequeue=flags.batch_size * 2,
+        allow_smaller_final_batch=True)
 
-    X_test_op, y_test_op = tf.train.batch([test_image, test_mask],
-                                          batch_size=flags.batch_size,
-                                          capacity=flags.batch_size * 2,
-                                          allow_smaller_final_batch=True)
+    X_test_op, y_test_op = tf.train.batch(
+        [test_image, test_mask],
+        batch_size=flags.batch_size,
+        capacity=flags.batch_size * 2,
+        allow_smaller_final_batch=True)
 
     summary_op = tf.summary.merge_all()
 
@@ -348,7 +368,8 @@ def main(flags):
         sess.run(init)
 
         saver = tf.train.Saver()
-        if os.path.exists(flags.ckdir) and tf.train.checkpoint_exists(flags.ckdir):
+        if os.path.exists(flags.ckdir) and tf.train.checkpoint_exists(
+                flags.ckdir):
             latest_check_point = tf.train.latest_checkpoint(flags.ckdir)
             saver.restore(sess, latest_check_point)
 
@@ -377,7 +398,8 @@ def main(flags):
                                    y: y_batch,
                                    mode: True})
 
-                    train_summary_writer.add_summary(step_summary, global_step_value)
+                    train_summary_writer.add_summary(step_summary,
+                                                     global_step_value)
 
                 total_iou = 0
                 for step in range(0, n_test, flags.batch_size):
@@ -390,7 +412,8 @@ def main(flags):
 
                     total_iou += step_iou * X_test.shape[0]
 
-                    test_summary_writer.add_summary(step_summary, (epoch + 1) * (step + 1))
+                    test_summary_writer.add_summary(step_summary,
+                                                    (epoch + 1) * (step + 1))
 
             saver.save(sess, "{}/model.ckpt".format(flags.ckdir))
 
